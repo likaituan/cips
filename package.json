@@ -1,0 +1,27 @@
+{
+  "name": "cips",
+  "version": "1.0.0",
+  "description": "cips is a four-tier structure node server, includes config, interfaces, plugins and services, also called 4s",
+  "main": "./cips-server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/likaituan/cips.git"
+  },
+  "author": "Li",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/likaituan/cips/issues"
+  },
+  "homepage": "https://github.com/likaituan/cips#readme",
+  "dependencies": {
+    "body-parser": "^1.18.2",
+    "express": "^4.15.5",
+    "ioredis": "^3.1.4",
+    "mongodb": "^2.2.31",
+    "node-uuid": "^1.4.8",
+    "restler": "^3.4.0"
+  }
+}
