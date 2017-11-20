@@ -4,28 +4,51 @@
 
 var {get, post, put, postJson, putJson} = require('restler');
 
-var getNow = () => {
-	return new Date().toISOString().replace('T',' ').replace(/\..+$/,'');
-};
+let { getNow } = require('./utils');
 
 var getPromise = function (url, method, parseFun) {
 	var defaultOptions = {
 		timeout: 60000
 	};
 	return function (data, options) {
-		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
-		options = Object.assign(options || {}, defaultOptions);
-
 		return new Promise((resolve, reject) => {
-			console.log(`\n=================== ${getNow()} =======================`);
-			console.log(`Method: ${method}`);
-			console.log(`Url: ${url}`);
-			console.log(`Data: ${JSON.stringify(data, null, 4)}`);
-			console.log(`Options: ${JSON.stringify(options, null, 4)}`);
+			data = data || {};
+			options = Object.assign(options || {}, defaultOptions);
+			// url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
+			// console.log(`\n=================== ${getNow()} =======================`);
+			console.log(`\n---- rest start ---->`);
+			console.log(`method: ${method}`);
+			console.log(`url: ${url}`);
+			console.log(`data: ${JSON.stringify(data, null, 4)}`);
+			// console.log(`Options: ${JSON.stringify(options, null, 4)}`);
 			var RestRequest = parseFun(url, data, options);
-			console.log(`Headers: ${JSON.stringify(RestRequest.headers, null, 4)}`);
-			RestRequest.on('complete', ret => {
-				console.log(`Result: ${JSON.stringify(ret, null, 4)}`);
+			// console.log(`Headers: ${JSON.stringify(RestRequest.headers, null, 4)}`);
+			RestRequest/*.on('error', err => {
+				console.log({err});
+				reject(500);
+			})*/.on('timeout', ms => {
+				console.log(`Timeout: ${ms} ms`);
+				reject({
+					success: false,
+					code: 504,
+					message: 'timeout'
+				});
+			}).on('complete', (ret, res) => {
+				if (ret instanceof Error) {
+					console.log('Error:', ret.message);
+					return reject(500);
+				}
+				// console.log({ret, res});
+				console.log(`statusCode: ${res.statusCode}`);
+				console.log(`result: ${JSON.stringify(ret, null, 4)}`);
+				console.log(`<----- rest end -----\n`);
+				if (res.statusCode === 504) {
+					return reject({
+						success: false,
+						code: 504,
+						message: 'timeout'
+					});
+				}
 				if (ret && ret.code && ret.message && ret.code!=200) {
 					return reject(`Rest ErrorCode: ${ret.code}`);
 				}
@@ -76,6 +99,7 @@ Rest.config = (ops, args) => {
 Rest.prototype.get = function (url) {
 	return getPromise(this.prefix + url, 'get', (url, data, options) => {
 		let query = require('querystring').stringify(data);
+		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
 		return get(`${url}?${query}`, options);
 	});
 };
@@ -83,6 +107,7 @@ Rest.prototype.get = function (url) {
 Rest.prototype.post = function (url) {
 	return getPromise(this.prefix + url, 'post', (url, data, options) => {
 		options.data = data;
+		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
 		// console.log({options});
 		return post(url, options);
 	});
@@ -91,16 +116,23 @@ Rest.prototype.post = function (url) {
 Rest.prototype.put = function (url) {
 	return getPromise(this.prefix + url, 'put', (url, data, options) => {
 		options.data = data;
+		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
 		return put(url, options);
 	});
 };
 
 Rest.prototype.postJson = function (url) {
-	return getPromise(this.prefix + url, 'postJson', (url, data, options) => postJson(url, data.json || data, options));
+	return getPromise(this.prefix + url, 'postJson', (url, data, options) => {
+		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
+		return postJson(url, data.json || data, options);
+	});
 };
 
 Rest.prototype.putJson = function (url) {
-	return getPromise(this.prefix + url, 'putJson', (url, data, options) => putJson(url, data.json || data, options));
+	return getPromise(this.prefix + url, 'putJson', (url, data, options) => {
+		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
+		return putJson(url, data.json || data, options);
+	});
 };
 
 module.exports = Rest;

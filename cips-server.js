@@ -19,10 +19,7 @@ app.use(bodyParser.json({ limit: '2mb' }));
 app.use(bodyParser.urlencoded({ limit: 10 * 1024 * 1024, extended: true }));
 
 var ops = {
-	port: 8080,
-	prefix: '',
-	routeMaps: {},
-	dir: require('path').resolve('./interfaces')
+	port: 8080
 };
 
 exports.config = options => {
@@ -35,9 +32,9 @@ exports.start = port => {
 	ops.rest && require('./rest').config(ops.rest, ops.args);
 
 	port = port || ops.port;
-	var routes = router.parse(ops.prefix, ops.dir, ops.routeMaps, app);
+	var routes = router.parse(ops.interface, app);
 	app.listen(port, err => {
 		console.log(err || `Node Is Running At http://localhost:${port} by cips`);
-		console.log(`\ntotal interfaces: ${routes.length}\n${routes.join('\n')}`);
+		ops.interface && ops.interface.showLog && console.log(`\ntotal interfaces: ${routes.length}\n${routes.join('\n')}`);
 	});
 };

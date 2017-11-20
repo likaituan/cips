@@ -3,7 +3,7 @@
  */
 
 var Redis = require('ioredis');
-var genUuid = require("node-uuid");
+var nodeUuid = require("node-uuid");
 var redis;
 
 exports.prefix = '';
@@ -37,30 +37,59 @@ exports.start = function (ops, args) {
 };
 
 // 获取(返回promise)
-exports.get = function(token) {
-	return redis.get(this.prefix + token).then(
+exports.get = function(key) {
+	return redis.get(this.prefix + key).then(
 		ret => {
-			var json = ret && JSON.parse(ret);
+			let json;
+			try {
+				json = ret && JSON.parse(ret);
+			} catch (jsonErr) {
+				console.log(`redis key [${key}] error:`);
+				console.log({ret, jsonErr});
+			}
 			return Promise.resolve(json);
 		},
 		err => Promise.reject(err)
 	);
 };
 
-exports.getToken = function(userId, token) {
-	if (userId) {
-		return this.get(userId).then(
-			ret => {
-				if (ret.token === token) {
-					return Promise.resolve(ret);
-				}
-			},
-			err => Promise.reject(err)
-		)
-	} else {
-		return Promise.reject('no userId')
-	}
+// 设置
+exports.set = function(key, data, expireTime) {
+	data = JSON.stringify(data);
+	return redis.set(this.prefix + key, data, 'EX', expireTime || ex);
 };
+
+// 删除
+exports.del = function(key) {
+	return redis.del(this.prefix + key);
+};
+
+// 生成UUID
+exports.genUuid = function () {
+	return nodeUuid.v4();
+};
+
+
+// 添加Token(data必须是个对象)
+exports.addToken = function (data) {
+	let token = exports.genUuid();
+	data.token = token;
+	exports.set(`token-${token}`, data);
+	return token;
+};
+
+// 获取Token
+exports.getToken = function (token) {
+	return exports.get(`token-${token}`);
+};
+
+// 删除Token
+exports.delToken = function (token) {
+	return exports.del(`token-${token}`);
+};
+
+
+/*
 
 // 添加
 exports.add = function(json, expireTime) {
@@ -70,19 +99,26 @@ exports.add = function(json, expireTime) {
 	return token;
 };
 
-// 设置
-exports.set = function(token, json, expireTime) {
-	json = JSON.stringify(json);
-	return redis.set(this.prefix + token, json, 'EX', expireTime || ex);
-};
 
-// 删除
-exports.del = function(token) {
-	redis.del(this.prefix + token);
-};
+ exports.getToken = function(userId, token) {
+ if (userId) {
+ return this.get(userId).then(
+ ret => {
+ if (ret.token === token) {
+ return Promise.resolve(ret);
+ }
+ },
+ err => Promise.reject(err)
+ )
+ } else {
+ return Promise.reject('no userId')
+ }
+ };
 
 // 续期
-exports.renewal = function(token, json) {
-	json.token = token;
-	this.set(json.userId, json);
+exports.renewal = function(key, data) {
+	data.token = key;
+	return this.set(data.userId, data);
 };
+
+*/
