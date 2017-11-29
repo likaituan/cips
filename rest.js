@@ -6,14 +6,15 @@ var {get, post, put, postJson, putJson} = require('restler');
 
 let { getNow } = require('./utils');
 
-var getPromise = function (url, method, parseFun) {
+var getPromise = function (url, method, parseFun, OPTIONS) {
 	var defaultOptions = {
 		timeout: 60000
 	};
 	return function (data, options) {
 		return new Promise((resolve, reject) => {
 			data = data || {};
-			options = Object.assign(options || {}, defaultOptions);
+			options = Object.assign(defaultOptions, OPTIONS || {}, options || {});
+			// console.log({options});
 			// url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
 			// console.log(`\n=================== ${getNow()} =======================`);
 			console.log(`\n---- rest start ---->`);
@@ -96,43 +97,43 @@ Rest.config = (ops, args) => {
 	parseConfig(ops, args);
 };
 
-Rest.prototype.get = function (url) {
+Rest.prototype.get = function (url, OPTIONS) {
 	return getPromise(this.prefix + url, 'get', (url, data, options) => {
 		let query = require('querystring').stringify(data);
 		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
 		return get(`${url}?${query}`, options);
-	});
+	}, OPTIONS);
 };
 
-Rest.prototype.post = function (url) {
+Rest.prototype.post = function (url, OPTIONS) {
 	return getPromise(this.prefix + url, 'post', (url, data, options) => {
 		options.data = data;
 		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
 		// console.log({options});
 		return post(url, options);
-	});
+	}, OPTIONS);
 };
 
-Rest.prototype.put = function (url) {
+Rest.prototype.put = function (url, OPTIONS) {
 	return getPromise(this.prefix + url, 'put', (url, data, options) => {
 		options.data = data;
 		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
 		return put(url, options);
-	});
+	}, OPTIONS);
 };
 
-Rest.prototype.postJson = function (url) {
+Rest.prototype.postJson = function (url, OPTIONS) {
 	return getPromise(this.prefix + url, 'postJson', (url, data, options) => {
 		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
 		return postJson(url, data.json || data, options);
-	});
+	}, OPTIONS);
 };
 
-Rest.prototype.putJson = function (url) {
+Rest.prototype.putJson = function (url, OPTIONS) {
 	return getPromise(this.prefix + url, 'putJson', (url, data, options) => {
 		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
 		return putJson(url, data.json || data, options);
-	});
+	}, OPTIONS);
 };
 
 module.exports = Rest;

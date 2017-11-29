@@ -7,13 +7,13 @@ exports.string = function (key) {
     return this.data[key];
 };
 
-// 转为数字
-exports.number = function (key) {
-    return +this.data[key];
+// 转为数字(广义上的)
+exports.numeral = function (key) {
+	return this.data[key];
 };
 
-// 转为数字
-exports.Number = function (key) {
+// 转为数字(量化)
+exports.number = function (key) {
     return +this.data[key];
 };
 
