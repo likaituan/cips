@@ -1,6 +1,6 @@
 {
   "name": "cips",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "cips is a four-tier structure node server, includes config, interfaces, plugins and services, also called 4s",
   "main": "./cips-server.js",
   "scripts": {
