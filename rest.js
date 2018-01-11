@@ -2,7 +2,8 @@
  * Created by likaituan on 27/09/2017.
  */
 
-var {get, post, put, postJson, putJson} = require('restler');
+let {get, post, put, del, postJson, putJson} = require('restler');
+let qs = require('querystring');
 
 let { getNow } = require('./utils');
 
@@ -69,11 +70,16 @@ var parseConfig = function(ops, args) {
 	var file = require('path').resolve(ops.config);
 	var config = require(file);
 	if (config.default_env) {
-		var env = ops.env || config.default_env;
-		config = config[env];
-		if (!config) {
-			console.log(`the mongodb env [${env}] is no exist!`);
-			process.exit();
+		if (/^\d+(\.\d+){3}$/.test(ops.env) && config.default_port) {
+			config = `http://${ops.env}:${config.default_port}`;
+		}
+		else {
+			var env = ops.env || config.default_env;
+			config = config[env];
+			if (!config) {
+				console.log(`the rest env [${env}] is no exist!`);
+				process.exit();
+			}
 		}
 	}
 	if (typeof config === 'function') {
@@ -85,7 +91,7 @@ var parseConfig = function(ops, args) {
 
 var Rest = function (apiName) {
 	// console.log(Rest.api, apiName);
-	this.prefix = Rest.api[apiName];
+	this.prefix = Rest.api[apiName] || '';
 };
 
 Rest.api = {};
@@ -99,9 +105,17 @@ Rest.config = (ops, args) => {
 
 Rest.prototype.get = function (url, OPTIONS) {
 	return getPromise(this.prefix + url, 'get', (url, data, options) => {
-		let query = require('querystring').stringify(data);
+		let query = qs.stringify(data);
 		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
 		return get(`${url}?${query}`, options);
+	}, OPTIONS);
+};
+
+Rest.prototype.del = function (url, OPTIONS) {
+	return getPromise(this.prefix + url, 'del', (url, data, options) => {
+		let query = qs.stringify(data);
+		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
+		return del(`${url}?${query}`, options);
 	}, OPTIONS);
 };
 
@@ -133,6 +147,44 @@ Rest.prototype.putJson = function (url, OPTIONS) {
 	return getPromise(this.prefix + url, 'putJson', (url, data, options) => {
 		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
 		return putJson(url, data.json || data, options);
+	}, OPTIONS);
+};
+
+Rest.prototype.getProxy = function (url, OPTIONS) {
+	if (OPTIONS || OPTIONS.useProxy === false) {
+		return this.get(url, OPTIONS);
+	}
+	return getPromise(url, 'get', (url, data, options) => {
+		let query = require('querystring').stringify(data);
+		url = url.replace(/\{(.+?)\}/g, (_,key) => data[key]);
+		url = `${url}?${query}`;
+
+		let proxyRequest = {};
+		proxyRequest.on = function (method, callback) {
+			if (method === 'complete') {
+				var shttps = require('socks5-https-client');
+				let params = require('url').parse(url);
+				shttps.get({
+					hostname: params.hostname,
+					path: params.path,
+					rejectUnauthorized: true // This is the default.
+				}, function (res) {
+					let code = '';
+					res.setEncoding('utf8');
+					res.on('data', chunk => {
+						code += chunk;
+					});
+					res.on('end', () => {
+						code = JSON.parse(code);
+						callback(code, res);
+					});
+
+				});
+			}
+			return proxyRequest;
+		};
+		return proxyRequest;
+
 	}, OPTIONS);
 };
 

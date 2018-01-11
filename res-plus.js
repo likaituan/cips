@@ -23,22 +23,22 @@ exports.print = function(json) {
     this.json(json);
 };
 
-// 输出成功
-exports.printOk = function(val) {
-    let json = {
-	    code: 200
-    };
+// 返回成功数据
+exports.okJson = function(val) {
+	let json = {
+		code: 200
+	};
 	if (typeof val === 'object') {
 		json.data = val;
 	}
-    else {
-	    json.message = val || 'ok';
-    }
-    exports.print.call(this, json);
+	else {
+		json.message = val || 'ok';
+	}
+	return json;
 };
 
-// 输出错误
-exports.printErr = function(val) {
+// 返回失败数据
+exports.errJson = function (val) {
 	let json = {
 		code: -3
 	};
@@ -55,5 +55,17 @@ exports.printErr = function(val) {
 	else if (typeof val === 'string') {
 		json.message = val;
 	}
+	return json;
+};
+
+// 输出成功
+exports.printOk = function() {
+	let json = exports.okJson(...arguments);
+    exports.print.call(this, json);
+};
+
+// 输出错误
+exports.printErr = function() {
+	let json = exports.errJson(...arguments);
     exports.print.call(this, json);
 };

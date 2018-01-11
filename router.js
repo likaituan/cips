@@ -8,6 +8,7 @@ var reqPlus = require('./req-plus');
 var resPlus = require('./res-plus');
 let Path = require('path');
 let { getNow } = require('./utils');
+let { getClientIp } = require('ifun/ip');
 
 var showErr = (res, routePath, interfaceErr) => {
 	console.log(`${routePath}:\n`, {interfaceErr});
@@ -38,38 +39,53 @@ let setAlias = function (alias, routes) {
 	});
 };
 
-exports.getRoutes = (path, dir, routes = []) => {
-	fs.readdirSync(dir).forEach(item => {
-		var newPath = `${path}/${item}`;
-		var newDir = `${dir}/${item}`;
-		var isDirectory = fs.statSync(newDir).isDirectory();
+let getRoutesByFile = (routePath, file) => {
+	let methods = require(file);
+	if (typeof(methods) == 'function') {
+		return [{
+			path: routePath,
+			fun: methods
+		}];
+	}
+	return Object.keys(methods).map(methodName => {
+		return {
+			path: `${routePath}/${methodName}`,
+			fun: methods[methodName]
+		};
+	});
+};
+
+let getRoutes = (routePath, filePath, routes = []) => {
+	fs.readdirSync(filePath).forEach(item => {
+		var subRoutePath = `${routePath}/${item}`;
+		var subFilePath = `${filePath}/${item}`;
+		var isDirectory = fs.statSync(subFilePath).isDirectory();
 		if (isDirectory) {
-			return this.getRoutes(newPath, newDir, routes);
+			return getRoutes(subRoutePath, subFilePath, routes);
 		}
-		newPath = newPath.replace('.js','').replace(/\./g, '/');
-		var file = require(newDir);
-		if (typeof(file) == 'function') {
-			return routes.push({path:newPath, fun:file});
-		}
-		Object.keys(file).forEach(key => {
-			routes.push({path: `${newPath}/${key}`, fun: file[key]});
-		});
+		subRoutePath = subRoutePath.replace('.js','').replace(/\./g, '/');
+		let routeItems = getRoutesByFile(subRoutePath, subFilePath);
+		routes = routes.concat(routeItems);
 	});
 	return routes;
 };
 
 
-exports.parse = (ops, app) => {
+exports.parse = (ops, app, OPS) => {
 	ops = ops || {};
 	if (typeof(ops) != 'object') {
 		ops = {dir: ops};
 	}
-	let path = ops.prefix || '';
-	let dir = ops.dir || Path.resolve('./interfaces');
+	let routePath = ops.prefix || '';
 	let alias = ops.alias || {};
-	let auth = ops.auth && require(Path.resolve(ops.auth)) || {};
+	let needLoginMaps = ops.needLogin && require(Path.resolve(ops.needLogin)) || {};
 	let myResPlus = ops.resPlus && require(Path.resolve(ops.resPlus)) || {};
-	var routes = this.getRoutes(path, dir);
+
+	let filePath = ops.dir || ops.file;
+	if (!fs.existsSync(filePath)){
+		throw `${filePath} is no exist!`;
+	}
+	let routes = ops.dir && getRoutes(routePath, ops.dir) || ops.file && getRoutesByFile(routePath, ops.file);
 	setAlias(alias, routes);
 	var arr_routes = [];
 	routes.forEach(item => {
@@ -80,24 +96,30 @@ exports.parse = (ops, app) => {
 			req.data = req._data = method == 'get' && req.params || method == 'post' && req.body;
 			// console.log({url:req.url, headers:req.headers, data:req.data, query:req.query});
 			Object.assign(req.data, req.query);
-
-			let token = req.headers.token || req.data.token;            // 为了兼容form提交
-			req.session = await redis.getToken(token) || {};
-			let isToken = token && token === req.session.token;
-			// console.log({params:req.data, token, isToken, session:req.session});
-			if (auth[routePath] && !isToken) {
-				return res.status(403).end('no auth');
+			if (ops.onTest) {
+				return ops.onTest(req, res);
 			}
 
+			let token = req.headers.token || req.data.token;            // 为了兼容form提交
+			req.session = OPS.redis && await redis.getToken(token) || {};
+			let isToken = token && token === req.session.token;
+			// console.log({params:req.data, token, isToken, session:req.session});
+			let needLogin = needLoginMaps[routePath] === true || needLoginMaps[routePath] !== false && ops.needLoginDefault;
+			if (!isToken && needLogin) {
+				return res.status(403).end('no auth');
+			}
 			Object.keys(reqPlus).forEach(x => req[x] = reqPlus[x].bind(req));
 			Object.keys(resPlus).forEach(x => res[x] = resPlus[x].bind(res));
 			Object.keys(myResPlus).forEach(x => res[x] = myResPlus[x].bind(res));
 			ops.onRequest && ops.onRequest(req, res);
+			let headers = {
+				ip: getClientIp(req)
+			};
 			console.log(`\n=================== ${getNow()} =======================`);
 			console.log(`Method: ${method}`);
 			console.log(`URL: ${req.url}`);
 			console.log(`Params: ${JSON.stringify(req.data,null,4)}`);
-			// console.log(`Headers: ${JSON.stringify(req.headers,null,4)}`);
+			console.log(`Headers: ${JSON.stringify(headers,null,4)}`);
 			try {
 				var asyncRet = await item.fun(req, res);
 				if (isPromise(asyncRet)){

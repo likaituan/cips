@@ -11,6 +11,7 @@ console.log = a => {
 var express = require('express');
 var router = require('./router');
 require('./promise-prototype');
+let { getMyIp } = require('ifun/ip');
 
 var app = express();
 
@@ -27,14 +28,20 @@ exports.config = options => {
 };
 
 exports.start = port => {
+	ops.static && app.use(express.static(ops.static));
 	ops.redis && require('./redis').start(ops.redis, ops.args);
 	ops.mongodb && require('./mongodb').config(ops.mongodb, ops.args);
 	ops.rest && require('./rest').config(ops.rest, ops.args);
 
 	port = port || ops.port;
-	var routes = router.parse(ops.interface, app);
+
+	var routes =  ops.interface && router.parse(ops.interface, app, ops);
 	app.listen(port, err => {
-		console.log(err || `Node Is Running At http://localhost:${port} by cips`);
+		let ip = getMyIp();
+		console.log(err || `Node Is Running At http://${ip}:${port} by cips`);
 		ops.interface && ops.interface.showLog && console.log(`\ntotal interfaces: ${routes.length}\n${routes.join('\n')}`);
 	});
 };
+
+exports.express = express;
+exports.app = app;

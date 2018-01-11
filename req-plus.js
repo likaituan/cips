@@ -19,7 +19,8 @@ exports.number = function (key) {
 
 // 转为布尔值
 exports.boolean = function (key) {
-    return !!this.data[key];
+	let v = this.data[key];
+    return v === 'false' ? false : !!v;
 };
 
 // 转为日期字符串
